@@ -121,6 +121,7 @@ def get_description(macro, data, type_):
         desc = "<h1>"+text(title)+"</h1>"+\
                badges+\
                p(1,id="package-info")+rawHTML(description)+p(0)+\
+               h(1, 3)+"Metadata"+h(0, 3)\
                p(1,id="package-info")+ul(1)+\
                maintainer_status_li+\
                maintainers_li+\
@@ -301,14 +302,63 @@ def generate_package_header(macro, package_name, opt_distro=None):
     repo_name = get_repo_name(data, package_name, opt_distro)
 
     desc = get_description(macro, data, 'package')
+    install_hints = get_install_hints(macro, package_name, data)
     links = get_package_links(macro, package_name, data, opt_distro, repo_name=repo_name, metapackage=is_metapackage)
     
     html = '<br><br>'.join([macro.formatter.rawHTML(item) for item in nav])
     if html:
         html = html + '<br>'
 
-    return html + links + desc 
+    return html + links + desc + install_hints
 
+def get_apt_url(deb_pkg_name):
+    return 'apt://'+deb_pkg_name
+
+def join_and(seq, sep=', '):
+    if len(seq) > 1:
+        return '%s and %s' % (sep.join(seq[:-1]), seq[-1])
+    return seq[0]
+
+def get_install_hints(macro, package_name, data):
+    f = macro.formatter
+    h, p = f.heading, f.paragraph
+
+    release_jobs = data.get('release_jobs', [])
+    if len(release_jobs) == 0:
+        return ''
+
+    # only Debian release jobs are supported
+    pkg_name = release_jobs[0].split('_')[0]
+    distro = release_jobs[0].split('-')[1]
+
+    os_set = set()
+    arch_set = set()
+    for release_job in release_jobs:
+        if not 'binarydeb' in release_job:
+            continue
+        splits = release_job.split('_')
+        os_set.add(splits[-2])
+        arch_set.add(splits[-1])
+
+    # generate text
+    hint_html = p(1)+\
+                'This package can be installed using <span class="backtick">apt-get</span>'+\
+                "on ROS "+distro.capitalize()+" "+\
+                "on Ubuntu "+join_and(os_set)+" ("+join_and(arch_set)+") "+\
+                "using the following command:"+\
+                p(0)
+    hint_html += p(1)+\
+                '<span class="backtick" style="text-indent:2em">sudo apt-get install '+pkg_name+'</span>'+\
+                p(0)+\
+                p(1)+\
+                "or by using the Ubuntu Software Centre "+\
+                '(<a href="'+get_apt_url(pkg_name)+'">AptURL</a>)'+\
+                p(0)
+    hint_html += p(1)+'Make sure you have completed the relevant <a href="http://wiki.ros.org/'+distro+'/Installation/Ubuntu">ROS Installation tutorial(s)</a> first.'+p(0)
+
+    html = h(1, 3)+"Installation"+h(0, 3)+\
+           hint_html
+    return html
 
 def get_package_links(macro, package_name, data, distro, repo_name=None, metapackage=False):
     f = macro.formatter
